@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "recording-to-text"
+version = "1.0.0"
+description = "Local recording-to-TXT app with Korean review markers"
+readme = "README.md"
+requires-python = ">=3.10,<3.14"
+license = {file = "LICENSE"}
+dependencies = ["faster-whisper==1.2.1", "av==16.1.0"]
+
+[project.urls]
+Repository = "https://github.com/unlock6/txt"
+Issues = "https://github.com/unlock6/txt/issues"
+
+[project.scripts]
+recording-to-text = "recording_to_text.transcribe:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+recording_to_text = ["models.json"]
