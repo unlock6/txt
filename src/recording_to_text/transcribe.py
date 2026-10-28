@@ -11,6 +11,7 @@ import threading
 import time
 
 from .review import format_transcript, segment_record
+from .processing_options import SPEED_CHOICES, transcription_segments
 from .models import ensure_model, model_path, needs_download, MANIFEST
 import tempfile
 
@@ -64,14 +65,11 @@ def save_result(source: Path, text: str) -> Path:
             temp_path.unlink(missing_ok=True)
 
 
-def recognize(source: Path, model=None, language="ko", progress=lambda value: None):
+def recognize(source: Path, model=None, language="ko", progress=lambda value: None, speed="normal"):
     source = validate_source(source)
     model = model if model is not None else load_model()
     started = time.monotonic()
-    segments, info = model.transcribe(
-        str(source), language=language, task="transcribe", beam_size=5,
-        vad_filter=True, condition_on_previous_text=False, word_timestamps=True,
-    )
+    segments, info = transcription_segments(model, source, language=language, speed=speed)
     lines = []
     for segment in segments:
         if segment.text.strip():
@@ -83,21 +81,21 @@ def recognize(source: Path, model=None, language="ko", progress=lambda value: No
     return text, lines, flagged_count, time.monotonic() - started
 
 
-def transcribe(source: Path, model=None, language="ko", progress=lambda value: None):
-    text, _, _, seconds = recognize(source, model, language, progress)
+def transcribe(source: Path, model=None, language="ko", progress=lambda value: None, speed="normal"):
+    text, _, _, seconds = recognize(source, model, language, progress, speed=speed)
     output = save_result(source, text)
     progress(100)
     return output, seconds
 
 
-def gui():
+def gui(speed="normal"):
     import tkinter as tk
     from tkinter import filedialog, messagebox, ttk
 
     app = tk.Tk()
     app.title("녹음을 글자로 · PC용")
-    app.geometry("780x700")
-    app.minsize(720, 680)
+    app.geometry("780x770")
+    app.minsize(720, 740)
     app.option_add("*Font", ("맑은 고딕", 12))
     style = ttk.Style(app)
     style.configure("TButton", font=("맑은 고딕", 13), padding=10)
@@ -113,12 +111,19 @@ def gui():
     model_selector = ttk.Combobox(model_row, textvariable=model_choice,
                                   values=list(model_options), state="readonly", width=28)
     model_selector.pack(side="left")
+    speed_choice = tk.StringVar(value=next(label for label, value in SPEED_CHOICES.items() if value == speed))
+    speed_row = ttk.Frame(frame)
+    speed_row.pack(anchor="w", pady=(0, 8))
+    ttk.Label(speed_row, text="처리 속도  ").pack(side="left")
+    speed_selector = ttk.Combobox(speed_row, textvariable=speed_choice, values=list(SPEED_CHOICES), state="readonly", width=28)
+    speed_selector.pack(side="left")
+    ttk.Label(frame, text="빠른 처리는 같은 모델로 여러 구간을 함께 처리합니다.\n인식 결과가 달라질 수 있으니 중요한 내용은 원음과 확인하세요.", foreground="#555555", wraplength=650).pack(anchor="w")
     chosen = tk.StringVar(value="선택된 녹음 파일이 없습니다.")
     status = tk.StringVar(value="준비됨 · 음성 인식은 이 PC에서 처리합니다.")
     ttk.Label(frame, textvariable=chosen, wraplength=650).pack(anchor="w", fill="x", pady=10)
     buttons = ttk.Frame(frame)
     buttons.pack(anchor="w", pady=10)
-    state = {"source": None, "output": None, "model": None, "model_name": None, "requested_model": None, "busy": False}
+    state = {"source": None, "output": None, "model": None, "model_name": None, "requested_model": None, "requested_speed": speed, "busy": False}
     events = queue.Queue()
 
     def select():
@@ -149,7 +154,8 @@ def gui():
                 state["model_name"] = state["requested_model"]
             events.put(("status", "글자로 바꾸는 중입니다. 창을 열어 두세요."))
             output, seconds = transcribe(state["source"], state["model"],
-                                         progress=lambda value: events.put(("progress", value)))
+                                         progress=lambda value: events.put(("progress", value)),
+                                         speed=state["requested_speed"])
             events.put(("done", (output, seconds)))
         except Exception as exc:
             events.put(("error", str(exc)))
@@ -164,8 +170,10 @@ def gui():
                 return
         state["busy"] = True
         state["requested_model"] = model_options[model_choice.get()]
+        state["requested_speed"] = SPEED_CHOICES[speed_choice.get()]
         state["output"] = None
         model_selector.configure(state="disabled")
+        speed_selector.configure(state="disabled")
         select_button.configure(state="disabled")
         run_button.configure(state="disabled")
         folder_button.configure(state="disabled")
@@ -176,6 +184,7 @@ def gui():
     def finish():
         state["busy"] = False
         model_selector.configure(state="readonly")
+        speed_selector.configure(state="readonly")
         select_button.configure(state="normal")
         run_button.configure(state="normal")
 
@@ -233,15 +242,16 @@ def main():
     parser.add_argument("--model", choices=["small", "turbo"], default="small")
     parser.add_argument("--download", action="store_true", help="Allow missing model downloads (audio stays local)")
     parser.add_argument("--check", action="store_true", help="Load the local model without audio")
+    parser.add_argument("--speed", choices=["normal", "fast"], default="normal", help="Use optional batch processing")
     args = parser.parse_args()
     if args.check:
         load_model(args.model, download=args.download, progress=print)
         print("OK: CPU int8 model loaded from disk, offline mode enabled.")
     elif args.audio:
-        output, seconds = transcribe(args.audio, model=load_model(args.model, download=args.download, progress=print), language=args.language)
+        output, seconds = transcribe(args.audio, model=load_model(args.model, download=args.download, progress=print), language=args.language, speed=args.speed)
         print(f"Saved: {output}\nElapsed: {seconds:.1f}s")
     else:
-        gui()
+        gui(speed=args.speed)
 
 
 if __name__ == "__main__":
