@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "recording-to-text"
-version = "1.1.0"
-description = "Local recording-to-TXT app with Korean review markers"
+version = "1.2.0"
+description = "Local recording-to-TXT desktop app"
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
 license = {file = "LICENSE"}
