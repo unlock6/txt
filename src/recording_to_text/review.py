@@ -54,20 +54,10 @@ def review_reasons(record):
 
 
 def format_transcript(records):
-    records = [row for row in records if row['text'].strip()]
-    count = sum(bool(review_reasons(row)[0]) for row in records)
-    lines = ['음성 변환 결과', f'확인 필요: {count}개 구간',
-             '[확인 필요]는 자동 점검 표시입니다. 표시가 없는 부분에도 오류가 있을 수 있습니다.',
+    lines = ['음성 변환 결과',
              '시각은 원본 녹음의 대략적인 재생 위치입니다. 인식된 표현은 임의로 고치지 않았습니다.', '']
     for row in records:
-        reasons, low_words = review_reasons(row)
-        span = f"{clock(row['start'])}~{clock(row['end'])}"
-        label = f'[확인 필요 {span}]' if reasons else f'[{span}]'
-        lines.append(f"{label} {row['text'].strip()}")
-        if reasons:
-            lines.append('  확인 이유: ' + ', '.join(reasons))
-        if low_words:
-            phrases = [f"{word['word'].strip()} ({clock(word['start'])})" for word in low_words]
-            lines.append('  다시 들을 표현: ' + ', '.join(phrases))
-        lines.append('')
-    return '\n'.join(lines).rstrip() + '\n', count
+        if row['text'].strip():
+            span = f"{clock(row['start'])}~{clock(row['end'])}"
+            lines.extend([f"[{span}] {row['text'].strip()}", ''])
+    return '\n'.join(lines).rstrip() + '\n', 0
