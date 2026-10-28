@@ -57,20 +57,22 @@ class TranscriptTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 validate_source(source)
 
-    def test_review_markers_include_playback_time_and_limit(self):
-        rows = [dict(start=45, end=50, text='다음 주에 전화 주세요.', avg_logprob=-0.2,
-                     words=[dict(start=46, end=47, word='다음', probability=0.2)])]
+    def test_low_confidence_speech_is_preserved_without_review_annotations(self):
+        rows = [dict(start=45, end=50, text='확인 필요하다고 말씀하셨어요.', avg_logprob=-3,
+                     words=[dict(start=46, end=47, word='말씀', probability=0.2)])]
         text, count = format_transcript(rows)
-        self.assertEqual(1, count)
-        self.assertIn('[확인 필요 00:45~00:50]', text)
-        self.assertIn('다음 (00:46)', text)
-        self.assertIn('표시가 없는 부분에도 오류', text)
+        self.assertEqual(0, count)
+        self.assertIn('[00:45~00:50] 확인 필요하다고 말씀하셨어요.', text)
+        self.assertNotIn('[확인 필요', text)
+        self.assertNotIn('확인 이유:', text)
+        self.assertNotIn('다시 들을 표현:', text)
         self.assertEqual('01:01:01', clock(3661))
 
-    def test_non_flagged_text_is_not_claimed_correct(self):
-        text, count = format_transcript([dict(start=0, end=1, text='예시', avg_logprob=-0.1)])
+    def test_blank_segments_are_ignored(self):
+        text, count = format_transcript([dict(start=0, end=1, text=' '), dict(start=1, end=2, text='예시')])
         self.assertEqual(0, count)
-        self.assertIn('표시가 없는 부분에도 오류', text)
+        self.assertIn('[00:01~00:02] 예시', text)
+        self.assertNotIn('[00:00~00:01]', text)
 
 
 class ModelTests(unittest.TestCase):
