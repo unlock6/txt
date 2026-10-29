@@ -8,6 +8,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 from .review import clock
+from .training_store import collect_example, collection_dir
 
 BG = '#f4f7f3'
 WHITE = '#ffffff'
@@ -111,7 +112,7 @@ def launch_gui(*, speed, validate_source, load_model, transcribe, speed_choices,
     run_btn = button(left, '텍스트로 변환  →', lambda: start(), primary=True, state='disabled'); run_btn.pack(fill='x', pady=(4, 0))
     label(right, 'STEP 02', fg='#83a58b', font=(FONT, 9, 'bold')).pack(anchor='w')
     label(right, '변환된 글', font=(FONT, 17, 'bold')).pack(anchor='w', pady=(5, 0))
-    label(right, '변환 중에도 내용을 직접 수정할 수 있습니다.', fg=MUTED, font=(FONT, 10)).pack(anchor='w', pady=(4, 14))
+    label(right, '변환 중 수정 · 수정본 저장 시 이 PC에 비교 자료 보관', fg=MUTED, font=(FONT, 10)).pack(anchor='w', pady=(4, 14))
     info = tk.Frame(right, bg=WHITE); info.pack(fill='x')
     label(info, textvariable=status, fg=GREEN, font=(FONT, 9), wraplength=390, justify='left').pack(side='left', fill='x', expand=True, anchor='w')
     label(info, textvariable=percent, fg=MUTED, font=(FONT, 9)).pack(side='right')
@@ -171,8 +172,20 @@ def launch_gui(*, speed, validate_source, load_model, transcribe, speed_choices,
             messagebox.showerror('수정본 저장', str(exc), parent=app)
             return
         state['dirty'] = False
-        status.set(f'수정본 저장 완료 · {dest.name}')
-        messagebox.showinfo('수정본 저장', f'수정본을 저장했습니다.\n\n{dest}', parent=app)
+        state['busy'] = True
+        for widget in (select_btn, run_btn, folder_btn, save_btn, model_box, speed_box):
+            widget.configure(state='disabled')
+        status.set('수정본 저장 완료 · 이 PC에 비교 자료 보관 중')
+        audio, original = state['source'], state['output']
+
+        def store():
+            try:
+                saved = collect_example(audio, original, dest)
+                events.put(('collected', (dest, saved)))
+            except Exception as exc:
+                events.put(('collection_error', (dest, str(exc))))
+
+        threading.Thread(target=store, daemon=True).start()
 
     def select():
         path = filedialog.askopenfilename(title='녹음 파일 선택', parent=app, filetypes=[('녹음 파일', '*.m4a *.mp3 *.wav *.amr *.3gp *.3ga *.aac *.ogg *.flac *.mp4'), ('모든 파일', '*.*')])
@@ -230,6 +243,16 @@ def launch_gui(*, speed, validate_source, load_model, transcribe, speed_choices,
                     status.set(f'변환 완료 · {output.name}'); percent.set('완료')
                     status.set(f'원본 저장 완료 · 수정 후 수정본 저장을 누르세요.')
                 elif kind == 'error': finish(); status.set('변환하지 못했습니다. 안내를 확인해 주세요.'); percent.set('중단'); messagebox.showerror('변환 확인', value, parent=app)
+                elif kind == 'collected':
+                    corrected, saved = value
+                    finish(); folder_btn.configure(state='normal'); save_btn.configure(state='normal')
+                    status.set('수정본 및 비교 자료 저장 완료')
+                    messagebox.showinfo('저장 완료', f'수정본: {corrected}\n\n비교 자료: {saved}\n\n자료는 이 PC에만 저장됩니다. 모델은 자동 학습되지 않습니다.', parent=app)
+                elif kind == 'collection_error':
+                    corrected, reason = value
+                    finish(); folder_btn.configure(state='normal'); save_btn.configure(state='normal')
+                    status.set('수정본 저장됨 · 비교 자료 보관 실패')
+                    messagebox.showerror('비교 자료 보관 실패', f'수정본은 저장됐습니다.\n{corrected}\n\n비교 자료를 보관하지 못했습니다: {reason}', parent=app)
         except queue.Empty: pass
         app.after(100, poll)
 
