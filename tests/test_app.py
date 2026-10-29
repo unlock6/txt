@@ -10,6 +10,7 @@ from unittest.mock import patch
 from recording_to_text import models
 from recording_to_text.review import clock, format_transcript
 from recording_to_text.ui import save_corrected
+from recording_to_text.training_store import collect_example
 from recording_to_text.transcribe import save_result, transcribe, validate_source
 
 
@@ -88,6 +89,36 @@ class TranscriptTests(unittest.TestCase):
                 with self.assertRaises(OSError):
                     save_corrected(original, 'unfinished')
             self.assertEqual([original], list(Path(folder).iterdir()))
+
+    def test_example_contains_audio_and_separate_snapshots(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            audio = root / 'private-name.wav'
+            original = root / 'original-name.txt'
+            correction = root / 'corrected-name.txt'
+            audio.write_bytes(b'fake audio')
+            original.write_text('original words', encoding='utf-8')
+            correction.write_text('corrected words', encoding='utf-8')
+            saved = collect_example(audio, original, correction, root=root / 'examples')
+            audio.write_bytes(b'changed audio')
+            correction.write_text('changed text', encoding='utf-8')
+            self.assertEqual(b'fake audio', (saved / 'audio.wav').read_bytes())
+            self.assertEqual('original words', (saved / 'original.txt').read_text(encoding='utf-8'))
+            self.assertEqual('corrected words', (saved / 'corrected.txt').read_text(encoding='utf-8'))
+            self.assertNotIn('private-name', (saved / 'manifest.json').read_text(encoding='utf-8'))
+            self.assertEqual(4, len(list(saved.iterdir())))
+
+    def test_failed_example_does_not_publish_partial_sample(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            audio, original, correction = [root / name for name in ('a.wav', 'b.txt', 'c.txt')]
+            for path in (audio, original, correction):
+                path.write_bytes(b'test')
+            with patch('recording_to_text.training_store._copy_verified', side_effect=OSError('copy error')):
+                with self.assertRaises(OSError):
+                    collect_example(audio, original, correction, root=root / 'examples')
+            self.assertEqual([], list((root / 'examples').iterdir()))
+            self.assertTrue(correction.is_file())
 
     def test_blank_segments_are_ignored(self):
         text, count = format_transcript([dict(start=0, end=1, text=' '), dict(start=1, end=2, text='예시')])
