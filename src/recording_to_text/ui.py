@@ -21,7 +21,7 @@ FONT = '맑은 고딕'
 def launch_gui(*, speed, validate_source, load_model, transcribe, speed_choices,
                needs_download=None, manifest=None):
     app = tk.Tk()
-    app.title('말을 글로 | 녹음 문자 변환')
+    app.title('녹음 파일 변환')
     app.geometry('1040x740')
     app.minsize(900, 680)
     app.configure(bg=BG)
@@ -34,9 +34,9 @@ def launch_gui(*, speed, validate_source, load_model, transcribe, speed_choices,
     state = {'source': None, 'output': None, 'model': None, 'model_name': None,
              'requested_model': None, 'requested_speed': speed, 'busy': False}
     events = queue.Queue()
-    chosen = tk.StringVar(value='아직 선택한 파일이 없어요')
-    detail = tk.StringVar(value='녹음 파일을 선택해 주세요.')
-    status = tk.StringVar(value='녹음 파일을 선택하면 변환을 시작할 수 있어요.')
+    chosen = tk.StringVar(value='선택된 파일 없음')
+    detail = tk.StringVar(value='녹음 파일을 선택하세요.')
+    status = tk.StringVar(value='파일을 선택해 주세요.')
     percent = tk.StringVar(value='대기 중')
     model_options = {'기본 모델 · small': 'small', '큰 모델 · turbo': 'turbo'}
     model_choice = tk.StringVar(value='기본 모델 · small')
@@ -57,14 +57,14 @@ def launch_gui(*, speed, validate_source, load_model, transcribe, speed_choices,
     top = tk.Frame(app, bg=BG); top.pack(fill='x', padx=32, pady=(12, 0))
     label(top, '▥', bg=GREEN, fg='white', font=(FONT, 17, 'bold'), padx=11, pady=5).pack(side='left')
     brand = tk.Frame(top, bg=BG); brand.pack(side='left', padx=12)
-    label(brand, '말을 글로', bg=BG, font=(FONT, 17, 'bold')).pack(anchor='w')
-    label(brand, 'VOICE TO TEXT', bg=BG, fg='#95a99a', font=(FONT, 8, 'bold')).pack(anchor='w')
-    label(top, '●  내 PC에서 안전하게 처리', bg=PALE, fg=GREEN, padx=12, pady=6, font=(FONT, 9, 'bold')).pack(side='right')
+    label(brand, '녹음 파일 변환', bg=BG, font=(FONT, 17, 'bold')).pack(anchor='w')
+    label(brand, 'AUDIO TO TEXT', bg=BG, fg='#95a99a', font=(FONT, 8, 'bold')).pack(anchor='w')
+    label(top, '●  이 PC에서 변환', bg=PALE, fg=GREEN, padx=12, pady=6, font=(FONT, 9, 'bold')).pack(side='right')
     intro = tk.Frame(app, bg=BG); intro.pack(fill='x', padx=34, pady=(12, 12))
-    label(intro, '목소리를 글로, 대화는 그대로.', bg=BG, font=(FONT, 20, 'bold')).pack(anchor='w')
-    label(intro, '녹음 파일을 선택하면 글로 옮겨드려요. 변환된 글은 녹음과 함께 확인해 주세요.',
+    label(intro, '녹음 파일을 텍스트로 변환', bg=BG, font=(FONT, 20, 'bold')).pack(anchor='w')
+    label(intro, '파일을 선택하고 변환을 시작하세요.',
           bg=BG, fg=MUTED, font=(FONT, 11)).pack(anchor='w', pady=(5, 0))
-    label(app, '✳  변환 결과에는 틀린 부분이 있을 수 있어요. 원래 녹음을 들으며 확인해 주세요.', bg=BG, fg=MUTED, font=(FONT, 10)).pack(side='bottom', anchor='w', padx=34, pady=(8, 10))
+    label(app, '✳  변환 결과는 원본 녹음을 들으며 확인하세요.', bg=BG, fg=MUTED, font=(FONT, 10)).pack(side='bottom', anchor='w', padx=34, pady=(8, 10))
     body = tk.Frame(app, bg=BG); body.pack(fill='both', expand=True, padx=32)
     body.grid_columnconfigure(0, weight=4, uniform='col'); body.grid_columnconfigure(1, weight=6, uniform='col'); body.grid_rowconfigure(0, weight=1)
     left = tk.Frame(body, bg=WHITE, highlightbackground='#e5ece3', highlightthickness=1, padx=20, pady=14)
@@ -72,9 +72,9 @@ def launch_gui(*, speed, validate_source, load_model, transcribe, speed_choices,
     left.grid(row=0, column=0, sticky='nsew', padx=(0, 9)); right.grid(row=0, column=1, sticky='nsew', padx=(9, 0))
     label(left, 'STEP 01', fg='#83a58b', font=(FONT, 9, 'bold')).pack(anchor='w')
     label(left, '녹음 파일 선택', font=(FONT, 17, 'bold')).pack(anchor='w', pady=(5, 0))
-    label(left, '글로 바꿀 녹음을 가져와 주세요.', fg=MUTED, font=(FONT, 10)).pack(anchor='w', pady=(3, 9))
+    label(left, '변환할 파일을 선택하세요.', fg=MUTED, font=(FONT, 10)).pack(anchor='w', pady=(3, 9))
     selection = tk.Frame(left, bg=WHITE); selection.pack(fill='x', pady=(3, 6))
-    select_btn = button(selection, '＋  녹음 파일 고르기', lambda: select())
+    select_btn = button(selection, '＋  파일 선택', lambda: select())
     select_btn.pack(anchor='w')
     label(selection, textvariable=chosen, bg=WHITE, fg=MUTED, font=(FONT, 10),
           wraplength=300, justify='left', anchor='w').pack(fill='x', pady=(9, 0))
@@ -83,11 +83,11 @@ def launch_gui(*, speed, validate_source, load_model, transcribe, speed_choices,
     model_box = ttk.Combobox(settings, textvariable=model_choice, values=list(model_options), state='readonly', style='Clean.TCombobox'); model_box.pack(fill='x', pady=(3, 6))
     label(settings, '처리 방식', font=(FONT, 10, 'bold')).pack(anchor='w')
     speed_box = ttk.Combobox(settings, textvariable=speed_choice, values=list(speed_choices), state='readonly', style='Clean.TCombobox'); speed_box.pack(fill='x', pady=(3, 0))
-    label(left, '빠른 처리는 PC 성능에 따라 속도와 결과가 달라질 수 있어요.', fg=MUTED, font=(FONT, 9), wraplength=300, justify='left').pack(anchor='w', pady=(5, 3))
-    run_btn = button(left, '글자로 변환하기  →', lambda: start(), primary=True, state='disabled'); run_btn.pack(fill='x', pady=(4, 0))
+    label(left, '빠른 처리의 속도와 결과는 PC 환경에 따라 다를 수 있습니다.', fg=MUTED, font=(FONT, 9), wraplength=300, justify='left').pack(anchor='w', pady=(5, 3))
+    run_btn = button(left, '텍스트로 변환  →', lambda: start(), primary=True, state='disabled'); run_btn.pack(fill='x', pady=(4, 0))
     label(right, 'STEP 02', fg='#83a58b', font=(FONT, 9, 'bold')).pack(anchor='w')
     label(right, '변환된 글', font=(FONT, 17, 'bold')).pack(anchor='w', pady=(5, 0))
-    label(right, '변환 중에는 인식된 내용이 차례로 나타나요.', fg=MUTED, font=(FONT, 10)).pack(anchor='w', pady=(4, 14))
+    label(right, '변환 중 인식된 내용이 표시됩니다.', fg=MUTED, font=(FONT, 10)).pack(anchor='w', pady=(4, 14))
     info = tk.Frame(right, bg=WHITE); info.pack(fill='x')
     label(info, textvariable=status, fg=GREEN, font=(FONT, 9), wraplength=390, justify='left').pack(side='left', fill='x', expand=True, anchor='w')
     label(info, textvariable=percent, fg=MUTED, font=(FONT, 9)).pack(side='right')
@@ -98,7 +98,7 @@ def launch_gui(*, speed, validate_source, load_model, transcribe, speed_choices,
     scroll = ttk.Scrollbar(text_frame, orient='vertical', command=text.yview); text.configure(yscrollcommand=scroll.set)
     scroll.pack(side='right', fill='y'); text.pack(side='left', fill='both', expand=True)
     actions = tk.Frame(right, bg=WHITE); actions.pack(fill='x', pady=(14, 0))
-    label(actions, '완료되면 녹음과 같은 폴더에 저장돼요.', fg=MUTED, font=(FONT, 9)).pack(side='left')
+    label(actions, '결과는 녹음 파일과 같은 폴더에 저장됩니다.', fg=MUTED, font=(FONT, 9)).pack(side='left')
     folder_btn = button(actions, '저장 폴더 열기', lambda: os.startfile(str(state['output'].parent)), state='disabled'); folder_btn.pack(side='right')
 
     def write_preview(value, clear=False):
@@ -114,19 +114,19 @@ def launch_gui(*, speed, validate_source, load_model, transcribe, speed_choices,
         except Exception as exc:
             messagebox.showerror('파일 확인', str(exc), parent=app); return
         state['source'] = source; state['output'] = None
-        chosen.set(source.name); detail.set('선택 완료 · 녹음은 원본 그대로 보관됩니다.')
-        status.set('파일 선택 완료 · 글자로 변환하기를 눌러 주세요.'); percent.set('대기 중')
+        chosen.set(source.name); detail.set('원본 녹음은 변경되지 않습니다.')
+        status.set('파일 선택 완료 · 변환을 시작하세요.'); percent.set('대기 중')
         bar['value'] = 0; folder_btn.configure(state='disabled'); run_btn.configure(state='normal'); write_preview('', clear=True)
 
     def work():
         try:
             name = state['requested_model']
             if state['model'] is None or state['model_name'] != name:
-                events.put(('status', '음성 인식 모델을 준비하고 있어요.'))
+                events.put(('status', '음성 인식 모델 준비 중'))
                 state['model'] = None; gc.collect()
                 state['model'] = load_model(name, lambda m: events.put(('status', m)))
                 state['model_name'] = name
-            events.put(('status', '녹음을 글로 바꾸고 있어요. 창을 닫지 마세요.'))
+            events.put(('status', '변환 중 · 창을 닫지 마세요.'))
             output, seconds = transcribe(state['source'], state['model'], speed=state['requested_speed'],
                 progress=lambda n: events.put(('progress', n)), on_segment=lambda row: events.put(('segment', row)))
             events.put(('done', (output, seconds)))
@@ -140,7 +140,7 @@ def launch_gui(*, speed, validate_source, load_model, transcribe, speed_choices,
             if not messagebox.askyesno('모델 준비', f'처음 한 번 약 {size:.1f}GB 모델을 내려받습니다.\n인터넷 연결과 저장 공간이 필요합니다.\n녹음 파일은 업로드하지 않습니다.\n계속할까요?', parent=app): return
         state.update(busy=True, requested_model=model, requested_speed=speed_choices[speed_choice.get()], output=None)
         for widget in (select_btn, run_btn, folder_btn, model_box, speed_box): widget.configure(state='disabled')
-        write_preview('', clear=True); bar['value'] = 0; percent.set('준비 중'); status.set('변환을 시작합니다. 잠시 기다려 주세요.')
+        write_preview('', clear=True); bar['value'] = 0; percent.set('준비 중'); status.set('변환 준비 중')
         threading.Thread(target=work, daemon=True).start()
 
     def finish():
