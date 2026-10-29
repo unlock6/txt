@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from recording_to_text import models
 from recording_to_text.review import clock, format_transcript
+from recording_to_text.ui import save_corrected
 from recording_to_text.transcribe import save_result, transcribe, validate_source
 
 
@@ -67,6 +68,26 @@ class TranscriptTests(unittest.TestCase):
         self.assertNotIn('확인 이유:', text)
         self.assertNotIn('다시 들을 표현:', text)
         self.assertEqual('01:01:01', clock(3661))
+
+    def test_corrected_copies_do_not_overwrite_original_or_prior_revision(self):
+        with tempfile.TemporaryDirectory() as folder:
+            original = Path(folder) / 'example.음성변환.txt'
+            original.write_text('first draft', encoding='utf-8')
+            first = save_corrected(original, '수정한 문장')
+            second = save_corrected(original, '다시 수정한 문장')
+            self.assertNotEqual(first, second)
+            self.assertEqual('first draft', original.read_text(encoding='utf-8'))
+            self.assertEqual('수정한 문장\n', first.read_text(encoding='utf-8-sig'))
+            self.assertEqual('다시 수정한 문장\n', second.read_text(encoding='utf-8-sig'))
+
+    def test_failed_corrected_save_does_not_leave_partial_file(self):
+        with tempfile.TemporaryDirectory() as folder:
+            original = Path(folder) / 'example.음성변환.txt'
+            original.write_text('first draft', encoding='utf-8')
+            with patch('recording_to_text.ui.os.fsync', side_effect=OSError('disk error')):
+                with self.assertRaises(OSError):
+                    save_corrected(original, 'unfinished')
+            self.assertEqual([original], list(Path(folder).iterdir()))
 
     def test_blank_segments_are_ignored(self):
         text, count = format_transcript([dict(start=0, end=1, text=' '), dict(start=1, end=2, text='예시')])
